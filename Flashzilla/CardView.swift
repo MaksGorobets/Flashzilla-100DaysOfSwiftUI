@@ -17,7 +17,7 @@ struct CardView: View {
     @State private var isDragging = false
     @State private var currentDrag = CGSize.zero
     
-    var removal: (() -> Void)? = nil
+    var removal: ((Bool) -> Void)? = nil
     
     var body: some View {
         ZStack {
@@ -81,7 +81,7 @@ struct CardView: View {
                     .onEnded { drag in
                         isDragging = false
                         if abs(currentDrag.width) > 200 {
-                            removal?()
+                            removal?(currentDrag.width > 200 ? true : false)
                         } else {
                             withAnimation {
                                 currentDrag = .zero

@@ -4,6 +4,8 @@
 //
 //  Created by Maks Winters on 25.02.2024.
 //
+// https://stackoverflow.com/questions/57244713/get-index-in-foreach-in-swiftui
+//
 
 import SwiftUI
 
@@ -11,15 +13,15 @@ struct ContentView: View {
     
     @Environment(\.accessibilityVoiceOverEnabled) var accessibilityVoiceOverEnabled
     @Environment(\.colorScheme) var colorScheme
-    @State private var cards = [Card]()
+    @Environment(\.scenePhase) var scenePhase
     
     @State private var timeRemaining = 100
+    @State private var isActive = true
+    @State private var isShowingEditingScreen = false
+    
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
-    @Environment(\.scenePhase) var scenePhase
-    @State private var isActive = true
-    
-    @State private var isShowingEditingScreen = false
+    let cardsManager = CardsManager.shared
     
     var body: some View {
         ZStack {
@@ -49,17 +51,23 @@ struct ContentView: View {
                     .accessibilityLabel("Timer")
                     .accessibilityHint(timeRemaining.formatted())
                 ZStack {
-                    ForEach(0..<cards.count, id: \.self) { index in
-                        CardView(card: cards[index]) {
-                            withAnimation {
-                                removeCard(at: index)
+                    ForEach(Array(cardsManager.cards.enumerated()), id: \.element.id) { index, card in
+                        CardView(card: card) { isRight in
+                            if isRight {
+                                withAnimation {
+                                    cardsManager.removeCard(card: card)
+                                }
+                            } else {
+                                withAnimation {
+                                    cardsManager.readdCard(card: card)
+                                }
                             }
                         }
-                        .stacked(at: index, in: cards.count)
-                        .allowsHitTesting(index == cards.count - 1)
-                        .accessibilityHidden(index < cards.count - 1)
+                        .stacked(at: index, in: cardsManager.cards.count)
+                        .allowsHitTesting(index == cardsManager.cards.count - 1)
+                        .accessibilityHidden(index < cardsManager.cards.count - 1)
                     }
-                    if cards.isEmpty {
+                    if cardsManager.cards.isEmpty {
                         VStack {
                             Text("NO CARDS LEFT")
                                 .bold()
@@ -107,14 +115,16 @@ struct ContentView: View {
             if accessibilityVoiceOverEnabled {
                 HStack {
                     Button {
-                        removeCard(at: cards.count - 1)
+                        guard !cardsManager.cards.isEmpty else { return }
+                        cardsManager.readdCard(card: cardsManager.cards.last!)
                     } label: {
                         Image(systemName: "xmark.circle")
                     }
                     .accessibilityLabel("Mark wrong")
                     Spacer()
                     Button {
-                        removeCard(at: cards.count - 1)
+                        guard !cardsManager.cards.isEmpty else { return }
+                        cardsManager.removeCard(card: cardsManager.cards.last!)
                     } label: {
                         Image(systemName: "checkmark.circle")
                     }
@@ -128,33 +138,19 @@ struct ContentView: View {
     func resetCards() {
         withAnimation {
             timeRemaining = 100
-            loadData()
+            cardsManager.loadData()
         }
         isActive = true
     }
     
-    func loadData() {
-        if let data = UserDefaults.standard.data(forKey: "Cards") {
-            if let decoded = try? JSONDecoder().decode([Card].self, from: data) {
-                cards = decoded
-            }
-        }
-    }
-    
     func updateTimer() {
         guard isActive else { return }
-        guard !cards.isEmpty else { return }
+        guard !cardsManager.cards.isEmpty else { return }
         withAnimation {
             if timeRemaining > 0 {
                 timeRemaining -= 1
             }
         }
-    }
-    
-    func removeCard(at index: Int) {
-        print(index)
-        guard index >= 0 else { return }
-        cards.remove(at: index)
     }
     
     func getBackground() -> String {
